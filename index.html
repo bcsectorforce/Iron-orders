@@ -754,8 +754,24 @@ function resolveBattle(payload){
   // randomness
   const randFactor = 1 + (Math.random()*GAME_CONFIG.BATTLE_RANDOMNESS*2 - GAME_CONFIG.BATTLE_RANDOMNESS);
 
-  const attScore = attackerPower * attMod * randFactor;
-  const defScore = defenderPower * defMod * (1 + (defenderRegion.stability/200));
+  // Fortification-based invasion penalty (defender advantage)
+const fortPenalty = fortificationPenalty(defenderRegion.fortification);
+
+// Reduce attacker effectiveness by fort penalty
+const fortPenaltyMultiplier = clamp(1 - fortPenalty, 0.5, 1); 
+// hard floor at 50% so forts can't make regions literally impossible
+
+const attScore =
+  attackerPower *
+  attMod *
+  randFactor *
+  fortPenaltyMultiplier;
+
+const defScore =
+  defenderPower *
+  defMod *
+  (1 + (defenderRegion.stability / 200));
+
 
   // casualties
   const casualtyFactor = 0.2 + Math.random()*0.3;
@@ -949,7 +965,13 @@ function checkUnrest(){
 /* -------------------------
    UTILITIES & HELPERS
    ------------------------- */
-function isRegionUnderThreat(regionId){
+function fortificationPenalty(fortValue) {
+  const tiers = Math.floor(fortValue / 10); // round DOWN
+  return tiers * 0.05; // 5% per tier
+}
+
+  
+  function isRegionUnderThreat(regionId){
   return STATE.scheduledEvents.some(e => 
     e.fnId === 'resolveBattle' &&
     e.turn === STATE.turn &&
