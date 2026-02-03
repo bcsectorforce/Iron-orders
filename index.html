@@ -777,11 +777,11 @@ function resolveBattle(payload){
 
     // give player bonuses if player won
 if (winner === STATE.playerFactionId) {
-  STATE.resources.manpower = clamp(STATE.resources.manpower + 60, 0, 99999);
-  STATE.resources.industry = clamp(STATE.resources.industry + 30, 0, 99999);
-  STATE.resources.economy = clamp(STATE.resources.economy + 30, 0, 99999);
-  STATE.resources.intelligence = clamp(STATE.resources.intelligence + 30, 0, 99999);
-  STATE.resources.morale = clamp(STATE.resources.morale + 30, 0, 100);
+  STATE.resources.manpower = clamp(STATE.resources.manpower + 90, 0, 99999);
+  STATE.resources.industry = clamp(STATE.resources.industry + 50, 0, 99999);
+  STATE.resources.economy = clamp(STATE.resources.economy + 50, 0, 99999);
+  STATE.resources.intelligence = clamp(STATE.resources.intelligence + 50, 0, 99999);
+  STATE.resources.morale = clamp(STATE.resources.morale + 50, 0, 100);
 
   logEvent(
     'Successful invasion! Manpower +60, Industry +30, Economy +30, Intelligence +30, Morale +30.'
