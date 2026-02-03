@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Iron Borders</title>
+<style>
+  :root{
+    --bg:#0f1724; --panel:#0b1220; --muted:#9aa7b2; --accent:#f59e0b;
+    --good:#16a34a; --bad:#ef4444;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#071026 0%, #0b1220 100%);color:#e6eef6}
+  .app{display:grid;grid-template-columns:300px 1fr 300px;gap:12px;padding:12px;height:100%}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:8px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6);overflow:auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  header h1{font-size:18px;margin:0}
+  .map{background:linear-gradient(180deg,#071a2b,#0b1220);padding:12px;border-radius:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+  .region{background:#071a2b;border-radius:6px;padding:8px;min-height:72px;cursor:pointer;border:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column;justify-content:space-between}
+  .region .title{font-weight:600;font-size:12px}
+  .region .meta{font-size:11px;color:var(--muted)}
+  .controls{display:flex;flex-direction:column;gap:8px}
+  .btn{background:linear-gradient(180deg,#0f1724,#0b1220);border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:6px;color:#e6eef6;cursor:pointer}
+  .btn.primary{background:linear-gradient(180deg,#0b6bff,#0849d1);border:none}
+  .log{height:240px;background:rgba(0,0,0,0.12);padding:8px;border-radius:6px;overflow:auto;font-size:13px}
+  .faction-list{display:flex;flex-direction:column;gap:6px}
+  .faction{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;background:rgba(255,255,255,0.02)}
+  .color-swatch{width:18px;height:18px;border-radius:4px}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .stat{background:rgba(255,255,255,0.02);padding:8px;border-radius:6px;font-size:13px}
+  .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .small{font-size:12px;color:var(--muted)}
+  .turnbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .region.selected{outline:3px solid rgba(255,255,255,0.06)}
+  .resource-row{display:flex;gap:8px;flex-wrap:wrap}
+  .resource{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;font-size:13px}
+  .tooltip{font-size:12px;color:var(--muted)}
+  footer{font-size:12px;color:var(--muted);margin-top:8px}
+  .danger{color:var(--bad)}
+  .good{color:var(--good)}
+  .mini{font-size:11px;color:var(--muted)}
+  .flex{display:flex;gap:8px;align-items:center}
+  .grow{flex:1}
+  .center{text-align:center}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .memory{font-size:12px;color:#cbd5e1;background:rgba(255,255,255,0.02);padding:6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel" id="leftPanel">
+    <header>
+      <div style="width:48px;height:48px;border-radius:8px;background:linear-gradient(180deg,#0b6bff,#0849d1);display:flex;align-items:center;justify-content:center;font-weight:700">IB</div>
+      <div>
+        <h1>Iron Borders</h1>
+        <div class="mini">Made by James Degenhardt and the BC</div>
+      </div>
+    </header>
+
+    <div class="turnbar">
+      <div><strong>Turn</strong> <span id="turnNumber">1</span></div>
+      <div><strong>Year</strong> <span id="year">1</span></div>
+    </div>
+
+    <div class="resource-row" id="resources">
+      <!-- resources injected -->
+    </div>
+
+    <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:8px 0">
+
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong>Factions</strong>
+        <button class="btn" id="btnRandomize">Randomize AI</button>
+      </div>
+      <div class="faction-list" id="factionList"></div>
+    </div>
+
+    <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:8px 0">
+
+    <div>
+      <strong>Turn Log</strong>
+      <div class="log" id="log"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+  <button class="btn primary" id="endTurn">End Turn</button>
+  <button class="btn" id="saveBtn">Save</button>
+  <button class="btn" id="loadBtn">Load</button>
+  <button class="btn danger" id="resetBtn">Reset Game</button>
+</div>
+
+    </div>
+
+    <footer>Do "cmd f" to scan for invasions on your region faster</footer>
+  </div>
+
+  <div class="panel" id="mapPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong>Battle Field Map Regions</strong>
+      <div class="small">Click a region to inspect and act</div>
+    </div>
+    <div class="map" id="map"></div>
+  </div>
+
+  <div class="panel" id="rightPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong>Region Inspector</strong>
+      <div class="mini" id="selectedRegionName">No region selected</div>
+    </div>
+
+    <div id="inspector" class="controls">
+      <div class="stats" id="regionStats">
+        <!-- region stats -->
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Actions</strong>
+        <div class="actions" id="actionButtons">
+          <!-- action buttons -->
+        </div>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Diplomacy</strong>
+        <div id="diplomacyPanel" class="controls"></div>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>AI Memory</strong>
+        <div id="memoryPanel" class="memory">No memory selected</div>
+      </div>
+
+      <div style="margin-top:8px">
+        <strong>Scheduled Events</strong>
+        <div id="eventsPanel" class="mini">No scheduled events</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  Supreme Commander Prototype
+  - Single-file prototype implementing core loop, map, factions, AI memory, actions, battles.
+  - Designed for extension and tuning.
+*/
+
+/* -------------------------
+   GAME CONFIG and UTILITIES
+   ------------------------- */
+const GAME_CONFIG = {
+  MAP_COLS: 8,
+  MAP_ROWS: 4,
+  STARTING_RESOURCES: { economy: 200, manpower: 100, industry: 80, intelligence: 20, morale: 70 },
+  REGION_BASE_POP: 40,
+  REGION_RESOURCE_VARIANCE: 30,
+  MAX_TURNS: 500,
+  ACTION_COSTS: {
+    mobilize: { economy: 10, manpower: 10, industry: 5 },
+    fortify: { economy: 8, industry: 6 },
+    invade: { economy: 30, manpower: 30, industry: 20 },
+    propaganda: { economy: 12, intelligence: 6 },
+    research: { economy: 20, industry: 20 },
+    spy: { economy: 10, intelligence: 10 },
+    sanction: { economy: 15 },
+    alliance: { economy: 10 },
+    assassinate: { economy: 40, intelligence: 30 }
+  },
+  AI_PERSONALITY_RANGE: { min: 10, max: 90 },
+  BATTLE_RANDOMNESS: 0.25, // fraction of randomness
+  DOCTRINE_EFFECT: { offense: 1.2, defense: 1.2, espionage: 1.2 }
+};
+
+function rand(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* -------------------------
+   GAME STATE
+   ------------------------- */
+let STATE = {
+  turn: 1,
+  year: 1,
+  resources: deepCopy(GAME_CONFIG.STARTING_RESOURCES),
+  factions: {},
+  regions: {},
+  playerFactionId: 'PLAYER',
+  scheduledEvents: [], // {turn, fnId, payload}
+  log: [],
+  selectedRegion: null
+};
+
+/* -------------------------
+   INITIALIZATION
+   ------------------------- */
+function initGame(){
+  // create factions
+  STATE.factions = {};
+  const names = ['Militarist Empire','Trade Union','Shadow State','Coalition Bloc','Free Cities'];
+  const colors = ['#ef4444','#f59e0b','#6b7280','#10b981','#60a5fa'];
+  for(let i=0;i<names.length;i++){
+    const id = 'F'+i;
+    STATE.factions[id] = {
+      id, name: names[i], color: colors[i],
+      traits: {
+        aggression: rand(30,80),
+        trust: rand(20,80),
+        paranoia: rand(20,80),
+        expansionism: rand(20,80),
+        honor: rand(10,90)
+      },
+      memory: [], // records of interactions
+      relations: {}, // trust values vs others
+      troops: rand(20,80),
+economy: rand(80,200),
+
+warPlan: null
+
+    
+      
+    };
+  }
+  // player faction
+  STATE.factions[STATE.playerFactionId] = {
+    id: STATE.playerFactionId, name: 'You', color: '#7c3aed',
+    traits: { aggression: 50, trust: 50, paranoia: 40, expansionism: 50, honor: 50 },
+    memory: [],
+relations: {},
+troops: 60,
+economy: 200,
+
+warPlan: null
+
+  
+    
+  };
+  // initialize relations
+  for(const a in STATE.factions){
+    for(const b in STATE.factions){
+      if(a===b) continue;
+      STATE.factions[a].relations[b] = 50; // neutral
+    }
+  }
+
+  // create map regions
+  STATE.regions = {};
+  const total = GAME_CONFIG.MAP_COLS * GAME_CONFIG.MAP_ROWS;
+  const factionIds = Object.keys(STATE.factions);
+  for(let r=0;r<GAME_CONFIG.MAP_ROWS;r++){
+    for(let c=0;c<GAME_CONFIG.MAP_COLS;c++){
+      const id = `R${r}_${c}`;
+      const owner = pick(factionIds);
+      STATE.regions[id] = {
+        id, name: `Region ${r+1}-${c+1}`, owner,
+        population: GAME_CONFIG.REGION_BASE_POP + rand(-GAME_CONFIG.REGION_RESOURCE_VARIANCE, GAME_CONFIG.REGION_RESOURCE_VARIANCE),
+        resources: rand(10,80),
+        stability: rand(40,80),
+        troops: rand(0,40),
+        strategic: rand(1,10),
+        fortification: 0,
+        unrest: 0
+      };
+    }
+  }
+
+  // ensure player owns at least one region
+  const playerRegion = Object.values(STATE.regions).find(r=>r.owner===STATE.playerFactionId);
+  if(!playerRegion){
+    const some = pick(Object.keys(STATE.regions));
+    STATE.regions[some].owner = STATE.playerFactionId;
+    STATE.regions[some].troops = 50;
+  }
+
+  STATE.scheduledEvents = [];
+  STATE.log = [];
+  STATE.selectedRegion = null;
+  STATE.turn = 1;
+  STATE.year = 1;
+  STATE.resources = deepCopy(GAME_CONFIG.STARTING_RESOURCES);
+  saveStateToLocal();
+  renderAll();
+  logEvent("Initialized. Good luck.");
+}
+
+/* -------------------------
+   RENDERING
+   ------------------------- */
+function renderAll(){
+  renderResources();
+  renderFactions();
+  renderMap();
+  renderInspector();
+  renderLog();
+  renderScheduled();
+  document.getElementById('turnNumber').innerText = STATE.turn;
+  document.getElementById('year').innerText = STATE.year;
+}
+
+function renderResources(){
+  const el = document.getElementById('resources');
+  el.innerHTML = '';
+  const keys = Object.keys(STATE.resources);
+  keys.forEach(k=>{
+    const div = document.createElement('div');
+    div.className = 'resource';
+    div.innerHTML = `<strong>${k.toUpperCase()}</strong> <div class="mini">${STATE.resources[k]}</div>`;
+    el.appendChild(div);
+  });
+}
+
+function renderFactions(){
+  const el = document.getElementById('factionList');
+  el.innerHTML = '';
+  Object.values(STATE.factions).forEach(f=>{
+    const div = document.createElement('div');
+    div.className = 'faction';
+    div.innerHTML = `
+      <div class="color-swatch" style="background:${f.color}"></div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>${f.name}</strong> <span class="mini">(${f.id})</span></div>
+          <div class="mini">Troops ${f.troops}</div>
+        </div>
+        <div class="mini">Agg ${f.traits.aggression} • Trust ${f.traits.trust} • Par ${f.traits.paranoia}</div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function resetGame(){
+  if(!confirm("Reset everything and start a new game? This cannot be undone.")) return;
+
+  // wipe save
+  localStorage.removeItem('sc_prototype_state');
+
+  // hard reset all state
+  initGame();
+
+
+  logEvent("Game fully reset.");
+}
+
+
+function evaluateThreat(factionId) {
+  const enemyRegions = Object.values(STATE.regions).filter(
+    r => r.owner !== factionId
+  );
+
+  let threat = 0;
+  enemyRegions.forEach(r => {
+    if (r.owner === STATE.playerFactionId) threat += 15;
+    threat += (50 - r.troops);
+    threat += r.strategic * 2;
+  });
+
+  return clamp(threat, 0, 100);
+}
+
+function aiPrepareForWar(faction) {
+  const regions = Object.values(STATE.regions).filter(r => r.owner === faction.id);
+  if (!regions.length) return;
+
+  // Fortify border regions
+  regions
+    .filter(r => r.strategic >= 6 || r.troops < 20)
+    .forEach(r => {
+      if (faction.economy >= 10) {
+        r.fortification += rand(5, 10);
+        faction.economy -= 10;
+        logEvent(`${faction.name} fortifies ${r.name}.`);
+      }
+    });
+
+  // Mobilize troops
+  const targetRegion = pick(regions);
+  if (faction.economy >= 15) {
+    targetRegion.troops += rand(8, 15);
+    faction.troops += 5;
+    faction.economy -= 15;
+    logEvent(`${faction.name} mobilizes troops in ${targetRegion.name}.`);
+  }
+}
+
+
+function renderMap(){
+  const map = document.getElementById('map');
+  map.style.gridTemplateColumns = `repeat(${GAME_CONFIG.MAP_COLS},1fr)`;
+  map.innerHTML = '';
+  
+  Object.values(STATE.regions).forEach(region=>{
+    const div = document.createElement('div');
+    div.className = 'region';
+    if(STATE.selectedRegion === region.id) div.classList.add('selected');
+    const owner = STATE.factions[region.owner];
+    div.style.borderColor = hexToRgba(owner.color, 0.18);
+
+    // RED MARK for AI attacks
+    if (isRegionUnderThreat(region.id)) {
+      div.style.boxShadow = '0 0 10px 2px var(--bad)';
+    }
+
+    div.innerHTML = `
+      <div>
+        <div class="title">${region.name}</div>
+        <div class="meta">${owner.name}</div>
+      </div>
+      <div class="mini">Pop ${region.population} • Res ${region.resources}</div>
+      <div class="mini">Stab ${region.stability} • Troops ${region.troops} • Fort ${region.fortification}</div>
+    `;
+    div.onclick = ()=>{ selectRegion(region.id); };
+    map.appendChild(div);
+  }); // <-- closes forEach
+
+} // <-- this closes renderMap
+
+
+
+function renderInspector(){
+  const name = STATE.selectedRegion ? STATE.regions[STATE.selectedRegion].name : 'No region selected';
+  document.getElementById('selectedRegionName').innerText = name;
+  const stats = document.getElementById('regionStats');
+  stats.innerHTML = '';
+  if(!STATE.selectedRegion){
+    stats.innerHTML = `<div class="mini">Select a region to see details and actions.</div>`;
+    document.getElementById('actionButtons').innerHTML = '';
+    document.getElementById('diplomacyPanel').innerHTML = '';
+    document.getElementById('memoryPanel').innerText = 'No memory selected';
+    return;
+  }
+  const r = STATE.regions[STATE.selectedRegion];
+  const owner = STATE.factions[r.owner];
+  stats.innerHTML = `
+    <div class="stat"><strong>Owner</strong><div class="mini">${owner.name} (${r.owner})</div></div>
+    <div class="stat"><strong>Population</strong><div class="mini">${r.population}</div></div>
+    <div class="stat"><strong>Resources</strong><div class="mini">${r.resources}</div></div>
+    <div class="stat"><strong>Stability</strong><div class="mini">${r.stability}</div></div>
+    <div class="stat"><strong>Troops</strong><div class="mini">${r.troops}</div></div>
+    <div class="stat"><strong>Strategic</strong><div class="mini">${r.strategic}</div></div>
+  `;
+
+  // actions
+  const actions = document.getElementById('actionButtons');
+  actions.innerHTML = '';
+  const actionList = [
+    {id:'mobilize',label:'Mobilize Troops'},
+    {id:'fortify',label:'Fortify Region'},
+    {id:'invade',label:'Launch Invasion'},
+    {id:'propaganda',label:'Propaganda Campaign'},
+    {id:'research',label:'Invest in Industry'},
+    {id:'spy',label:'Deploy Spy'},
+    {id:'sanction',label:'Economic Sanction'},
+    {id:'assassinate',label:'Assassinate Leader'}
+  ];
+  actionList.forEach(a=>{
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.innerText = a.label;
+    btn.onclick = ()=>{ performAction(a.id); };
+    actions.appendChild(btn);
+  });
+
+  // diplomacy
+  const dip = document.getElementById('diplomacyPanel');
+  dip.innerHTML = '';
+  Object.values(STATE.factions).forEach(f=>{
+    if(f.id === STATE.regions[STATE.selectedRegion].owner) return;
+    const d = document.createElement('div');
+    d.className = 'faction';
+    d.style.justifyContent = 'space-between';
+    d.innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="color-swatch" style="background:${f.color}"></div>
+        <div><strong>${f.name}</strong><div class="mini">Trust ${STATE.factions[STATE.playerFactionId].relations[f.id]}</div></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" onclick="proposeAlliance('${f.id}')">Propose Alliance</button>
+        <button class="btn" onclick="issueUltimatum('${f.id}')">Ultimatum</button>
+      </div>
+    `;
+    dip.appendChild(d);
+  });
+
+  // memory
+  const mem = document.getElementById('memoryPanel');
+  const ownerMem = STATE.factions[r.owner].memory.slice(-6).reverse();
+  mem.innerHTML = ownerMem.length ? ownerMem.map(m=>`• ${m}`).join('<br>') : 'No notable memory';
+}
+
+function renderLog(){
+  const el = document.getElementById('log');
+  el.innerHTML = STATE.log.slice(-200).map(l => {
+    let mark = '';
+    if(l.type === 'danger') mark = '<span style="color:var(--bad);font-weight:bold;">&#x26A0; </span>'; // ⚠️
+    return `<div>${mark}${l.message}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+
+function renderScheduled(){
+  const el = document.getElementById('eventsPanel');
+
+  // show all scheduled battles where player is defender
+  const playerEvents = STATE.scheduledEvents.filter(e => 
+    e.fnId === 'resolveBattle' && e.payload.defenderRegion && STATE.regions[e.payload.defenderRegion] && e.payload.defenderRegionOwner === STATE.playerFactionId
+  );
+
+  if(playerEvents.length === 0){
+    el.innerText = 'No scheduled events';
+  } else {
+    el.innerHTML = playerEvents.map(e => {
+      const targetRegion = STATE.regions[e.payload.defenderRegion];
+      const attackerFaction = STATE.factions[e.payload.aiId] || { name: 'Unknown' };
+      return `⚠️ ${attackerFaction.name} will attack ${targetRegion.name} (Turn ${e.turn})`;
+    }).join('<br>');
+  }
+}
+
+
+
+
+/* -------------------------
+   SELECTION & ACTIONS
+   ------------------------- */
+function selectRegion(regionId){
+  STATE.selectedRegion = regionId;
+  renderAll();
+}
+
+function performAction(actionId){
+  if(!STATE.selectedRegion){ logEvent('No region selected.'); return; }
+  const region = STATE.regions[STATE.selectedRegion];
+  const player = STATE.factions[STATE.playerFactionId];
+  const costs = GAME_CONFIG.ACTION_COSTS[actionId] || {};
+  // check resources
+  for(const k in costs){
+    if((STATE.resources[k]||0) < costs[k]){ logEvent(`Not enough ${k} to ${actionId}.`); return; }
+  }
+  // deduct
+  for(const k in costs) STATE.resources[k] -= costs[k];
+
+  // action effects
+  switch(actionId){
+    case 'mobilize':
+      region.troops += 15;
+      STATE.resources.manpower = clamp(STATE.resources.manpower - 10, 0, 9999);
+      scheduleEvent(STATE.turn+1, 'moraleDrop', {region: region.id, amount: 5}, 'Mobilization morale effect');
+      logEvent(`Mobilized troops in ${region.name}. Troops +15.`);
+      recordMemory(region.owner, `Player mobilized in ${region.name}`);
+      break;
+    case 'fortify':
+      region.fortification += 10;
+      logEvent(`Fortified ${region.name}. Fortification +10.`);
+      recordMemory(region.owner, `Player fortified ${region.name}`);
+      break;
+    case 'invade':
+      // choose target adjacent region if enemy exists; for prototype pick a random enemy region
+      const target = findEnemyRegionAdjacent(region.owner) || findRandomEnemyRegion(region.owner);
+      if(!target){ logEvent('No valid invasion target found.'); break; }
+      logEvent(`Launched invasion from ${region.name} to ${target.name}.`);
+      scheduleEvent(STATE.turn+0, 'resolveBattle', {attackerRegion: region.id, defenderRegion: target.id}, 'Invasion');
+      recordMemory(target.owner, `Player invaded ${target.name}`);
+      break;
+    case 'propaganda':
+      region.stability = clamp(region.stability + 10, 0, 100);
+      STATE.resources.intelligence = clamp(STATE.resources.intelligence - 6, 0, 9999);
+      logEvent(`Propaganda in ${region.name}. Stability +10.`);
+      recordMemory(region.owner, `Player ran propaganda in ${region.name}`);
+      break;
+    case 'research':
+      STATE.resources.industry = clamp(STATE.resources.industry + 10, 0, 9999);
+      logEvent(`Invested in industry. Industry +10.`);
+      break;
+    case 'spy':
+      STATE.resources.intelligence = clamp(STATE.resources.intelligence - 10, 0, 9999);
+      const intel = gatherIntel();
+      logEvent(`Spy operation: intel gained: ${intel}.`);
+      break;
+    case 'sanction':
+      // pick a target faction (owner of region)
+      const targetFaction = STATE.factions[region.owner];
+      targetFaction.economy = clamp(targetFaction.economy - 15, 0, 9999);
+      logEvent(`Sanctioned ${targetFaction.name}. Their economy -15.`);
+      recordMemory(targetFaction.id, `Player sanctioned ${targetFaction.name}`);
+      break;
+    case 'assassinate':
+      // risky: chance to kill leader -> reduce faction morale/trust
+      const success = Math.random() < 0.25 + (STATE.resources.intelligence/200);
+      if(success){
+        // heavy penalty to target
+        const victim = STATE.factions[region.owner];
+        victim.traits.honor = clamp(victim.traits.honor - 30, 0, 100);
+        victim.troops = Math.max(0, victim.troops - 20);
+        logEvent(`Assassination succeeded against ${victim.name}. Chaos ensues.`);
+        recordMemory(victim.id, `Player assassinated a leader`);
+      } else {
+        logEvent(`Assassination failed. Operation exposed.`);
+        // increase paranoia
+        STATE.factions[region.owner].traits.paranoia = clamp(STATE.factions[region.owner].traits.paranoia + 20, 0, 100);
+        recordMemory(region.owner, `Player attempted assassination`);
+      }
+      break;
+    default:
+      logEvent(`Action ${actionId} not implemented.`);
+  }
+  renderAll();
+}
+
+/* -------------------------
+   DIPLOMACY
+   ------------------------- */
+function proposeAlliance(targetId){
+  const player = STATE.factions[STATE.playerFactionId];
+  const target = STATE.factions[targetId];
+  // cost
+  if(STATE.resources.economy < GAME_CONFIG.ACTION_COSTS.alliance.economy){ logEvent('Not enough economy to propose alliance.'); return; }
+  STATE.resources.economy -= GAME_CONFIG.ACTION_COSTS.alliance.economy;
+  // acceptance depends on trust, honor, and player memory
+  const base = target.traits.trust + (target.traits.honor/2) - target.traits.paranoia/2;
+  const chance = clamp(base/150 + (player.traits.honor/200), 0.05, 0.95);
+  if(Math.random() < chance){
+    // form alliance: increase mutual relations
+    player.relations[targetId] = clamp((player.relations[targetId]||50)+20,0,100);
+    target.relations[player.id] = clamp((target.relations[player.id]||50)+20,0,100);
+    logEvent(`${target.name} accepted alliance proposal.`);
+    recordMemory(targetId, `Accepted alliance with Player`);
+  } else {
+    logEvent(`${target.name} rejected alliance proposal.`);
+    recordMemory(targetId, `Rejected alliance proposal from Player`);
+    // increase paranoia slightly
+    target.traits.paranoia = clamp(target.traits.paranoia + 5, 0, 100);
+  }
+  renderAll();
+}
+
+function issueUltimatum(targetId){
+  if(STATE.resources.economy < GAME_CONFIG.ACTION_COSTS.sanction.economy){ logEvent('Not enough economy to issue ultimatum.'); return; }
+  STATE.resources.economy -= GAME_CONFIG.ACTION_COSTS.sanction.economy;
+  const target = STATE.factions[targetId];
+  // ultimatum reduces trust heavily; may provoke war
+  target.relations[STATE.playerFactionId] = clamp((target.relations[STATE.playerFactionId]||50)-30,0,100);
+  logEvent(`Issued ultimatum to ${target.name}. Trust -30.`);
+  recordMemory(targetId, `Player issued ultimatum`);
+  // chance of retaliation
+  if(Math.random() < (target.traits.aggression/100)){
+    // schedule a retaliatory raid
+    const enemyRegion = findRandomRegionOwnedBy(targetId);
+    if(enemyRegion){
+      scheduleEvent(STATE.turn+1, 'raid', {fromFaction: targetId, targetRegion: enemyRegion.id}, `Retaliatory raid by ${target.name}`);
+      logEvent(`${target.name} is likely to retaliate.`);
+    }
+  }
+  renderAll();
+}
+
+/* -------------------------
+   AI TURN LOGIC
+   ------------------------- */
+function aiDecisions() {
+  Object.values(STATE.factions).forEach(f => {
+    if (f.id === STATE.playerFactionId) return;
+
+    const threat = evaluateThreat(f.id);
+
+    // === WAR PLANNING ===
+    if (!f.warPlan && threat > 60 && Math.random() < 0.4) {
+      f.warPlan = {
+        targetFaction: STATE.playerFactionId,
+        turnsLeft: rand(2, 4)
+      };
+      f.memory.push(`Preparing for war against Player`);
+      logEvent(`${f.name} is preparing for war.`);
+      return;
+    }
+
+    // === PREPARATION PHASE ===
+    if (f.warPlan) {
+      aiPrepareForWar(f);
+      f.warPlan.turnsLeft--;
+
+      if (f.warPlan.turnsLeft <= 0) {
+        const from = findRandomRegionOwnedBy(f.id);
+        const target = findRandomEnemyRegion(f.id, true);
+        if (from && target) {
+          scheduleEvent(
+            STATE.turn,
+            'resolveBattle',
+            { attackerRegion: from.id, defenderRegion: target.id, aiId: f.id },
+            `${f.name} launches planned invasion`
+          );
+          logEvent(`${f.name} launches a prepared invasion!`);
+        }
+        f.warPlan = null;
+      }
+      return;
+    }
+
+    // === PEACETIME BEHAVIOR ===
+    if (Math.random() < 0.5) {
+      f.economy += rand(5, 15);
+      f.troops += rand(2, 6);
+    }
+  });
+}
+
+
+  
+ 
+
+
+function maybeAIAttack(factionId) {
+  const factionRegions = Object.values(STATE.regions).filter(r => r.owner === factionId);
+  factionRegions.forEach(region => {
+    // Determine invasion chance
+    let chance = 0.3; // 30% default
+    if (STATE.turn % 2 === 0) chance = 0.5; // 50% on even turns
+
+    if (Math.random() < chance) {
+      // Find a target region, now prioritizing player
+      const target = findRandomEnemyRegion(factionId, true);
+      if (target) {
+        scheduleEvent(
+          STATE.turn, 
+          'resolveBattle', 
+          { attackerRegion: region.id, defenderRegion: target.id, aiId: factionId }, 
+          `${STATE.factions[factionId].name} attacks ${target.name}`
+        );
+        logEvent(`${STATE.factions[factionId].name} is launching an attack from ${region.name} to ${target.name} (Turn ${STATE.turn}).`);
+      }
+    }
+  });
+}
+
+
+/* -------------------------
+   BATTLE RESOLUTION
+   ------------------------- */
+function resolveBattle(payload){
+  const attackerRegion = STATE.regions[payload.attackerRegion];
+  const defenderRegion = STATE.regions[payload.defenderRegion];
+  if(!attackerRegion || !defenderRegion) return;
+  const attackerFaction = STATE.factions[attackerRegion.owner];
+  const defenderFaction = STATE.factions[defenderRegion.owner];
+
+  // compute power
+  const attackerPower = (attackerRegion.troops + attackerFaction.troops*0.2) * (1 + attackerRegion.fortification/100);
+  const defenderPower = (defenderRegion.troops + defenderFaction.troops*0.2) * (1 + defenderRegion.fortification/100);
+
+  // doctrine modifiers (simple)
+  const attackerDoctrine = attackerFaction.doctrine || 'offense';
+  const defenderDoctrine = defenderFaction.doctrine || 'defense';
+  const attMod = GAME_CONFIG.DOCTRINE_EFFECT[attackerDoctrine] || 1;
+  const defMod = GAME_CONFIG.DOCTRINE_EFFECT[defenderDoctrine] || 1;
+
+  // randomness
+  const randFactor = 1 + (Math.random()*GAME_CONFIG.BATTLE_RANDOMNESS*2 - GAME_CONFIG.BATTLE_RANDOMNESS);
+
+  const attScore = attackerPower * attMod * randFactor;
+  const defScore = defenderPower * defMod * (1 + (defenderRegion.stability/200));
+
+  // casualties
+  const casualtyFactor = 0.2 + Math.random()*0.3;
+  const attCasualties = Math.round(attackerRegion.troops * casualtyFactor * (defScore/Math.max(1,attScore)));
+  const defCasualties = Math.round(defenderRegion.troops * casualtyFactor * (attScore/Math.max(1,defScore)));
+
+  attackerRegion.troops = Math.max(0, attackerRegion.troops - attCasualties);
+  defenderRegion.troops = Math.max(0, defenderRegion.troops - defCasualties);
+
+  // determine winner
+  let winner = null;
+  if(attScore > defScore * 1.1){
+    winner = attackerRegion.owner;
+    // capture region
+    defenderRegion.owner = attackerRegion.owner;
+    defenderRegion.troops = Math.max(5, Math.round(attackerRegion.troops * 0.5));
+    attackerRegion.troops = Math.max(0, Math.round(attackerRegion.troops * 0.3));
+    logEvent(`${STATE.factions[winner].name} captured ${defenderRegion.name} after battle. Casualties: Att ${attCasualties}, Def ${defCasualties}.`);
+
+    // give player bonuses if player won
+if (winner === STATE.playerFactionId) {
+  STATE.resources.manpower = clamp(STATE.resources.manpower + 60, 0, 99999);
+  STATE.resources.industry = clamp(STATE.resources.industry + 30, 0, 99999);
+  STATE.resources.economy = clamp(STATE.resources.economy + 30, 0, 99999);
+  STATE.resources.intelligence = clamp(STATE.resources.intelligence + 30, 0, 99999);
+  STATE.resources.morale = clamp(STATE.resources.morale + 30, 0, 100);
+
+  logEvent(
+    'Successful invasion! Manpower +60, Industry +30, Economy +30, Intelligence +30, Morale +30.'
+  );
+}
+
+
+    // morale and trust effects
+    STATE.factions[defenderRegion.owner].traits.trust = clamp(STATE.factions[defenderRegion.owner].traits.trust - 10, 0, 100);
+}
+ else {
+    winner = defenderRegion.owner;
+    logEvent(`${STATE.factions[winner].name} repelled the attack at ${defenderRegion.name}. Casualties: Att ${attCasualties}, Def ${defCasualties}.`);
+    // defender morale boost
+    defenderRegion.stability = clamp(defenderRegion.stability + 5, 0, 100);
+  }
+
+  // global effects
+  STATE.resources.morale = clamp(STATE.resources.morale - Math.round((attCasualties+defCasualties)/10), 0, 100);
+  // record memories
+  recordMemory(attackerRegion.owner, `Attacked ${defenderRegion.name}`);
+  recordMemory(defenderRegion.owner, `Defended ${defenderRegion.name}`);
+  renderAll();
+}
+
+/* -------------------------
+   EVENTS & SCHEDULER
+   ------------------------- */
+function scheduleEvent(turn, fnId, payload, desc){
+  STATE.scheduledEvents.push({turn, fnId, payload, desc});
+  renderScheduled();
+}
+
+function processScheduled(){
+  const due = STATE.scheduledEvents.filter(e=>e.turn <= STATE.turn);
+  STATE.scheduledEvents = STATE.scheduledEvents.filter(e=>e.turn > STATE.turn);
+  due.forEach(e=>{
+    switch(e.fnId){
+      case 'resolveBattle':
+        resolveBattle(e.payload);
+        break;
+      case 'raid':
+        // simple raid: reduce resources in target region
+        const target = STATE.regions[e.payload.targetRegion];
+        if(target){
+          target.resources = Math.max(0, target.resources - rand(5,20));
+          logEvent(`${STATE.factions[e.payload.fromFaction].name} raided ${target.name}. Resources -${rand(5,20)}.`);
+        }
+        break;
+      case 'spyReport':
+        // produce a small intel report
+        logEvent(`Spy report: ${STATE.factions[e.payload.from].name} gathered intel on ${STATE.factions[e.payload.target].name}.`);
+        break;
+      case 'moraleDrop':
+        const reg = STATE.regions[e.payload.region];
+        if(reg){ reg.stability = clamp(reg.stability - e.payload.amount, 0, 100); logEvent(`Morale drop in ${reg.name} -${e.payload.amount}.`); }
+        break;
+      default:
+        console.warn('Unknown event', e);
+    }
+  });
+}
+
+/* -------------------------
+   TURN ADVANCEMENT
+   ------------------------- */
+function endTurn(){
+  // AI decisions
+  aiDecisions();
+
+  // process scheduled events
+  processScheduled();
+
+  // resolve global economy and resource flows
+  produceResources();
+
+  // increment turn
+  STATE.turn += 1;
+  if(STATE.turn % 10 === 0) STATE.year += 1;
+
+  // random events
+  maybeRandomEvent();
+
+  // check for rebellions
+  checkUnrest();
+
+  renderAll();
+  saveStateToLocal();
+}
+
+function produceResources(){
+  // each region produces resources for its owner
+  const production = {};
+  Object.values(STATE.regions).forEach(r=>{
+    const owner = r.owner;
+    production[owner] = (production[owner]||0) + Math.round(r.resources/10);
+    // small population growth
+    r.population = clamp(r.population + Math.round(r.stability/100), 1, 9999);
+  });
+  // apply to factions and player resources
+  Object.keys(production).forEach(fid=>{
+    const amt = production[fid];
+    STATE.factions[fid].economy = clamp(STATE.factions[fid].economy + amt, 0, 99999);
+    if(fid === STATE.playerFactionId){
+      STATE.resources.economy = clamp(STATE.resources.economy + amt, 0, 99999);
+    }
+  });
+  // industry consumes economy to build
+  STATE.resources.industry = clamp(STATE.resources.industry + Math.round(STATE.resources.economy/100), 0, 99999);
+  // morale slowly recovers
+  STATE.resources.morale = clamp(STATE.resources.morale + 1, 0, 100);
+  logEvent('Resources produced and industry adjusted.');
+}
+
+/* -------------------------
+   RANDOM EVENTS & UNREST
+   ------------------------- */
+function maybeRandomEvent(){
+  if(Math.random() < 0.12){
+    const ev = pick(['Drought','Economic Boom','Rebellion','Technological Breakthrough']);
+    switch(ev){
+      case 'Drought':
+        // reduce resources in random region
+        const r = pick(Object.values(STATE.regions));
+        r.resources = Math.max(0, r.resources - rand(5,25));
+        logEvent(`Random Event: Drought in ${r.name}. Resources reduced.`);
+        break;
+      case 'Economic Boom':
+        STATE.resources.economy += 30;
+        logEvent('Random Event: Economic boom. Economy +30.');
+        break;
+      case 'Rebellion':
+        const rr = pick(Object.values(STATE.regions));
+        rr.unrest += rand(10,40);
+        rr.stability = clamp(rr.stability - rand(10,30), 0, 100);
+        logEvent(`Random Event: Rebellion in ${rr.name}. Stability -${rand(10,30)}.`);
+        break;
+      case 'Technological Breakthrough':
+        STATE.resources.intelligence += 10;
+        logEvent('Random Event: Technological breakthrough. Intelligence +10.');
+        break;
+    }
+  }
+}
+
+function checkUnrest(){
+  Object.values(STATE.regions).forEach(r=>{
+    if(r.unrest > 50 || r.stability < 20){
+      // chance of revolt
+      if(Math.random() < 0.25){
+        // region flips to neutral rebel faction
+        const rebelId = 'REBELS';
+        if(!STATE.factions[rebelId]){
+          STATE.factions[rebelId] = { id: rebelId, name: 'Rebels', color: '#9ca3af', traits: {aggression:50,trust:10,paranoia:40,expansionism:20,honor:10}, memory:[], relations:{}, troops: rand(10,40), economy:10 };
+        }
+        r.owner = rebelId;
+        r.troops = Math.max(5, Math.round(r.population/5));
+        r.unrest = 0;
+        logEvent(`${r.name} has revolted and is now controlled by Rebels.`);
+      }
+    }
+  });
+}
+
+/* -------------------------
+   UTILITIES & HELPERS
+   ------------------------- */
+function isRegionUnderThreat(regionId){
+  return STATE.scheduledEvents.some(e => 
+    e.fnId === 'resolveBattle' &&
+    e.turn === STATE.turn &&
+    STATE.regions[e.payload.defenderRegion] &&
+    e.payload.defenderRegion === regionId &&
+    e.payload.aiId // ensure it's an AI attack
+  );
+}
+
+
+function findEnemyRegionAdjacent(factionId){
+  // for prototype, find any region owned by others with low troops
+  const enemies = Object.values(STATE.regions).filter(r=>r.owner !== factionId && r.troops < 20);
+  return enemies.length ? pick(enemies) : null;
+}
+function findRandomEnemyRegion(factionId, prioritizePlayer=false){
+  const enemies = Object.values(STATE.regions).filter(r => r.owner !== factionId);
+  if(enemies.length === 0) return null;
+  
+  if(prioritizePlayer){
+    const playerRegions = enemies.filter(r => r.owner === STATE.playerFactionId);
+    if(playerRegions.length && Math.random() < 0.7){ // 70% chance to target player region if exists
+      return pick(playerRegions);
+    }
+  }
+
+  return pick(enemies);
+}
+function findWeakNeighborRegion(factionId){
+  // pick a region owned by others with low stability or troops
+  const candidates = Object.values(STATE.regions).filter(r=>r.owner !== factionId && (r.troops < 20 || r.stability < 40));
+  return candidates.length ? pick(candidates) : null;
+}
+function findRandomRegionOwnedBy(factionId){
+  const list = Object.values(STATE.regions).filter(r=>r.owner === factionId);
+  return list.length ? pick(list) : null;
+}
+function findRandomRegionOwnedById(factionId){
+  return findRandomRegionOwnedBy(factionId);
+}
+function gatherIntel(){
+  // returns a small intel string
+  const sample = [
+    'Enemy troop movement near border.',
+    'Trade negotiations underway.',
+    'Weak defenses in northern region.',
+    'Secret alliance forming.'
+  ];
+  return pick(sample);
+}
+function recordMemory(factionId, text){
+  if(!STATE.factions[factionId]) return;
+  STATE.factions[factionId].memory.push(`${STATE.turn}: ${text}`);
+  // keep memory short
+  if(STATE.factions[factionId].memory.length > 200) STATE.factions[factionId].memory.shift();
+}
+
+/* -------------------------
+   LOGGING & PERSISTENCE
+   ------------------------- */
+function hexToRgba(hex, alpha){
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+
+function logEvent(text){
+  const t = `Turn ${STATE.turn}: ${text}`;
+  STATE.log.push(t);
+  console.log(t);
+  renderLog();
+}
+
+function logEvent(message, type='normal'){
+  STATE.log.push({ message, type });
+  renderLog();
+}
+
+function saveStateToLocal(){
+  try{
+    localStorage.setItem('sc_prototype_state', JSON.stringify(STATE));
+    logEvent('Term Saved.');
+  }catch(e){
+    console.warn('Save failed', e);
+  }
+}
+function loadStateFromLocal(){
+  try{
+    const s = localStorage.getItem('sc_prototype_state');
+    if(!s) { logEvent('No saved game found.'); return; }
+    STATE = JSON.parse(s);
+    renderAll();
+    logEvent('Game loaded.');
+  }catch(e){
+    console.warn('Load failed', e);
+  }
+}
+
+/* -------------------------
+   UI HOOKS
+   ------------------------- */
+document.getElementById('endTurn').onclick = ()=> endTurn();
+document.getElementById('resetBtn').onclick = ()=> resetGame();
+document.getElementById('saveBtn').onclick = ()=> saveStateToLocal();
+document.getElementById('loadBtn').onclick = ()=> loadStateFromLocal();
+document.getElementById('btnRandomize').onclick = ()=> { randomizeAI(); renderAll(); };
+
+function randomizeAI(){
+  Object.values(STATE.factions).forEach(f=>{
+    if(f.id === STATE.playerFactionId) return;
+    f.traits.aggression = rand(GAME_CONFIG.AI_PERSONALITY_RANGE.min, GAME_CONFIG.AI_PERSONALITY_RANGE.max);
+    f.traits.trust = rand(GAME_CONFIG.AI_PERSONALITY_RANGE.min, GAME_CONFIG.AI_PERSONALITY_RANGE.max);
+    f.traits.paranoia = rand(GAME_CONFIG.AI_PERSONALITY_RANGE.min, GAME_CONFIG.AI_PERSONALITY_RANGE.max);
+    f.traits.expansionism = rand(GAME_CONFIG.AI_PERSONALITY_RANGE.min, GAME_CONFIG.AI_PERSONALITY_RANGE.max);
+    f.traits.honor = rand(GAME_CONFIG.AI_PERSONALITY_RANGE.min, GAME_CONFIG.AI_PERSONALITY_RANGE.max);
+  });
+}
+
+
+/* -------------------------
+   DIPLOMACY HELPERS (global functions for inline onclick)
+   ------------------------- */
+window.proposeAlliance = proposeAlliance;
+window.issueUltimatum = issueUltimatum;
+
+/* -------------------------
+   STARTUP
+   ------------------------- */
+function hexToRgba(hex, alpha=1){
+  const bigint = parseInt(hex.slice(1),16);
+  const r = (bigint>>16)&255;
+  const g = (bigint>>8)&255;
+  const b = bigint&255;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+
+// try load, else init
+if(localStorage.getItem('sc_prototype_state')){
+  try{
+    loadStateFromLocal();
+  }catch(e){
+    initGame();
+  }
+} else {
+  initGame();
+}
+
+// initialize game on page load
+initGame();
+
+// hook up buttons
+document.getElementById('endTurn').onclick = endTurn;
+document.getElementById('btnRandomize').onclick = initGame;
+document.getElementById('saveBtn').onclick = saveStateToLocal;
+document.getElementById('loadBtn').onclick = loadStateFromLocal;
+document.getElementById('resetBtn').onclick = resetGame;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initGame();
+  document.getElementById('endTurn').onclick = endTurn;
+  document.getElementById('resetBtn').onclick = resetGame;
+});
+
+// expose some debug helpers
+window.STATE = STATE;
+window.GAME_CONFIG = GAME_CONFIG;
+</script>
+</body>
+</html>
